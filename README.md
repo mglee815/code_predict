@@ -1,2 +1,1 @@
-# code_predict
-Dacon practice
+### code_prediction
