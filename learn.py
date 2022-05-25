@@ -7,17 +7,19 @@ from torch.utils.data import Dataset, DataLoader
 from pytorch_transformers import BertTokenizer, BertForSequenceClassification, BertConfig
 from torch.optim import Adam
 import torch.nn.functional as F
-
+import pdb
+import torch.nn as nn
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--code_path' ,  type = str)
-parser.add_argument('--save_path' ,  type = str)
+parser.add_argument('--processed_data_path' ,  type = str)
+parser.add_argument('--batch_size' ,  type = int)
+parser.add_argument('--epochs' ,  type = int)
 
 args = parser.parse_args()
 
 
-train_df = pd.read_csv(args.save_path + 'train.csv')
-test_df = pd.read_csv(args.save_path + 'valid.csv')
+train_df = pd.read_csv(args.processed_data_path + 'train.csv')
+test_df = pd.read_csv(args.processed_data_path + 'valid.csv')
 
 class CodeDataset(Dataset):
     def __init__(self, df):
@@ -33,8 +35,8 @@ class CodeDataset(Dataset):
         return text, label
     
     
-nsmc_train_dataset = NsmcDataset(train_df)
-train_loader = DataLoader(nsmc_train_dataset, batch_size=2, shuffle=True, num_workers=2)
+code_train_dataset = CodeDataset(train_df)
+train_loader = DataLoader(code_train_dataset, batch_size=args.batch_size, shuffle=True)
 
 
 device = torch.device("cuda")
@@ -53,9 +55,11 @@ total_correct = 0
 
 
 model.train()
-for epoch in range(epochs):
+for epoch in range(args.epochs):
     
-    for text, label in train_loader:
+
+    for idx, (text, label) in enumerate(train_loader):
+        if idx == 5 : break
         optimizer.zero_grad()
         
         # encoding and zero padding
