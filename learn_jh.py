@@ -4,7 +4,7 @@ import torch
 import argparse
 
 from torch.utils.data import Dataset, DataLoader
-from pytorch_transformers import BertTokenizer, BertForSequenceClassification, BertConfig
+from transformers import BertTokenizer, BertForSequenceClassification
 from torch.optim import Adam
 import torch.nn.functional as F
 import pdb
@@ -14,6 +14,8 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--processed_data_path' ,  type = str)
 parser.add_argument('--batch_size' ,  type = int)
 parser.add_argument('--epochs' ,  type = int)
+parser.add_argument('--model_name' ,  type = str)
+
 
 args = parser.parse_args()
 
@@ -38,10 +40,10 @@ class CodeDataset(Dataset):
 code_train_dataset = CodeDataset(train_df)
 train_loader = DataLoader(code_train_dataset, batch_size=args.batch_size, shuffle=True)
 
-
+print("load the model")
 device = torch.device("cuda")
-tokenizer = BertTokenizer.from_pretrained('bert-base-multilingual-cased')
-model = BertForSequenceClassification.from_pretrained('bert-base-multilingual-cased')
+tokenizer = BertTokenizer.from_pretrained(args.model_name)
+model = BertForSequenceClassification.from_pretrained(args.model_name)
 model.to(device)
 
 optimizer = Adam(model.parameters(), lr=1e-6)
