@@ -2,7 +2,7 @@ import os
 from tqdm import tqdm
 import pandas as pd
 import argparse
-
+import pdb
 from rank_bm25 import BM25Okapi
 from itertools import combinations
 from transformers import AutoTokenizer
@@ -39,54 +39,9 @@ def preprocess_script(script):
 
 
 
-if __name__ == '__main__':
-    code_folder = args.code_path
-    problem_folders = os.listdir(args.code_path)
-    preproc_scripts = []
-    problem_nums = []
-
-    for problem_folder in tqdm(problem_folders):
-        scripts = os.listdir(os.path.join(code_folder,problem_folder))
-        problem_num = scripts[0].split('_')[0]
-        for script in scripts:
-            script_file = os.path.join(code_folder,problem_folder,script)
-            preprocessed_script = preprocess_script(script_file)
-
-            preproc_scripts.append(preprocessed_script)
-        problem_nums.extend([problem_num]*len(scripts))
-
-
-    df = pd.DataFrame(data = {'code':preproc_scripts, 'problem_num':problem_nums})
-
-    print(f"len of df : {len(df)}")
-
-    tokenizer = AutoTokenizer.from_pretrained("microsoft/graphcodebert-base")
-    df['tokens'] = df['code'].apply(tokenizer.tokenize)
-    df['len'] = df['tokens'].apply(len)
-
-    ndf = df[df['len'] <= 512].reset_index(drop=True)
-    print(ndf.describe())
-
-
-
-
-    train_df, valid_df, train_label, valid_label = train_test_split(
-            ndf,
-            ndf['problem_num'],
-            random_state=1995,
-            test_size=0.1,
-            stratify=ndf['problem_num'],
-        )
-
-    train_df = train_df.reset_index(drop=True)
-    valid_df = valid_df.reset_index(drop=True)
-    print(f"len of train df : {len(train_df)}")
-    print(f"len test df : {len(valid_df)}")
-
-
-
-    codes = train_df['code'].to_list()
-    problems = train_df['problem_num'].unique().tolist()
+def process_and_save(df, path):
+    codes = df['code'].to_list()
+    problems = df['problem_num'].unique().tolist()
     problems.sort()
 
     tokenized_corpus = [tokenizer.tokenize(code) for code in codes]
@@ -96,7 +51,7 @@ if __name__ == '__main__':
     total_negative_pairs = []
 
     for problem in tqdm(problems):
-        solution_codes = train_df[train_df['problem_num'] == problem]['code']
+        solution_codes = df[df['problem_num'] == problem]['code']
         positive_pairs = list(combinations(solution_codes.to_list(),2))
 
         solution_codes_indices = solution_codes.index.to_list()
@@ -113,7 +68,7 @@ if __name__ == '__main__':
                 high_score_idx = negative_code_ranking[ranking_idx]
                 
                 if high_score_idx not in solution_codes_indices:
-                    negative_solutions.append(train_df['code'].iloc[high_score_idx])
+                    negative_solutions.append(df['code'].iloc[high_score_idx])
                 ranking_idx += 1
 
             for negative_solution in negative_solutions:
@@ -143,6 +98,53 @@ if __name__ == '__main__':
         'similar':total_label
     })
     pair_data = pair_data.sample(frac=1).reset_index(drop=True)
+    pair_data.to_csv(args.save_path + path,index=False)
 
-    pair_data.to_csv(args.save_path,index=False)
+if __name__ == '__main__':
+    code_folder = args.code_path
+    problem_folders = os.listdir(args.code_path)
+    preproc_scripts = []
+    problem_nums = []
+
+    for problem_folder in tqdm(problem_folders):
+        scripts = os.listdir(os.path.join(code_folder,problem_folder))
+        problem_num = scripts[0].split('_')[0]
+        for script in scripts:
+            script_file = os.path.join(code_folder,problem_folder,script)
+            preprocessed_script = preprocess_script(script_file)
+
+            preproc_scripts.append(preprocessed_script)
+        problem_nums.extend([problem_num]*len(scripts))
+
+
+    df = pd.DataFrame(data = {'code':preproc_scripts, 'problem_num':problem_nums})
+
+    print(f"len of df : {len(df)}")
+
+    tokenizer = AutoTokenizer.from_pretrained("microsoft/graphcodebert-base")
+    df['tokens'] = df['code'].apply(tokenizer.tokenize)
+    df['len'] = df['tokens'].apply(len)
+
+    ndf = df[df['len'] <= 512].reset_index(drop=True)
+    print(ndf.describe())
+
+    train_df, valid_df, _, _ = train_test_split(
+            ndf,
+            ndf['problem_num'],
+            random_state=1995,
+            test_size=0.1,
+            stratify=ndf['problem_num'],
+        )
+
+    train_df = train_df.reset_index(drop=True)
+    valid_df = valid_df.reset_index(drop=True)
+    print(f"len of train df : {len(train_df)}")
+    print(f"len test df : {len(valid_df)}")
+    
+    process_and_save(train_df, "train.csv")
+    process_and_save(valid_df, "valid.csv")
+    
+
+
+
 
